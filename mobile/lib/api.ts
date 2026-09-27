@@ -24,7 +24,19 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    throw new ApiError(`Request failed: ${response.status}`, response.status);
+    let message = `Request failed: ${response.status}`;
+    try {
+      const body = (await response.json()) as { detail?: string | { msg?: string }[] };
+      if (typeof body.detail === "string") {
+        message = body.detail;
+      } else if (Array.isArray(body.detail) && body.detail[0]?.msg) {
+        message = body.detail[0].msg;
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+    const apiError = new ApiError(message, response.status);
+    throw apiError;
   }
 
   return response.json() as Promise<T>;

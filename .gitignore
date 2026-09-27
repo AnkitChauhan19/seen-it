@@ -38,6 +38,8 @@ mobile/.kotlin/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+mobile/expo-env.d.ts
+
 
 # OS / IDE
 .DS_Store
@@ -51,3 +53,5 @@ Thumbs.db
 *.log
 coverage/
 PLAN.md
+docs/
+supabase/

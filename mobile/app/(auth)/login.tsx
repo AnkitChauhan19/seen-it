@@ -1,39 +1,97 @@
-import { Redirect, useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Link, Redirect, useRouter } from "expo-router";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
+import { AuthDivider } from "@/components/auth/auth-divider";
+import { AuthField } from "@/components/auth/auth-field";
+import { AuthScreenShell } from "@/components/auth/auth-screen-shell";
+import { colors } from "@/constants/theme";
+import { signInWithEmail } from "@/lib/auth-service";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function LoginScreen() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const signInDev = useAuthStore((state) => state.signInDev);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (isAuthenticated) {
     return <Redirect href="/(tabs)/home" />;
   }
 
+  const handleSignIn = async () => {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await signInWithEmail({ email, password });
+      router.replace("/(tabs)/home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <View className="flex-1 items-center justify-center bg-slate-950 px-6">
-      <Text className="mb-2 text-4xl font-bold tracking-tight text-white">
-        SeenIt
+    <AuthScreenShell>
+      <Text className="mb-6 text-2xl font-bold" style={{ color: colors.text }}>
+        Sign in
       </Text>
-      <Text className="mb-10 text-center text-base text-slate-400">
-        Track everything you watch — movies, series, anime, and more.
-      </Text>
+
+      <AuthField
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+      />
+      <AuthField
+        autoCapitalize="none"
+        autoComplete="password"
+        placeholder="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      {error ? (
+        <Text className="mb-2 text-center text-sm text-red-400">{error}</Text>
+      ) : null}
+
       <Pressable
-        className="rounded-xl bg-sky-500 px-8 py-3 active:bg-sky-600"
-        onPress={() => {
-          signInDev();
-          router.replace("/(tabs)/home");
-        }}
+        className="mt-1 rounded-full py-4 active:opacity-90 disabled:opacity-60"
+        style={{ backgroundColor: colors.gold }}
+        disabled={isSubmitting}
+        onPress={() => void handleSignIn()}
       >
-        <Text className="text-base font-semibold text-white">
-          Continue (dev)
-        </Text>
+        {isSubmitting ? (
+          <ActivityIndicator color="#000000" />
+        ) : (
+          <Text className="text-center text-base font-bold text-black">
+            SIGN IN
+          </Text>
+        )}
       </Pressable>
-      <Text className="mt-4 text-center text-xs text-slate-500">
-        Supabase auth will replace this temporary entry point.
-      </Text>
-    </View>
+
+      <AuthDivider />
+
+      <View className="flex-row flex-wrap items-center justify-center">
+        <Text className="text-sm text-neutral-400">
+          Don&apos;t have an account?{" "}
+        </Text>
+        <Link href="./signup" asChild>
+          <Pressable>
+            <Text className="text-sm font-medium" style={{ color: colors.link }}>
+              Sign Up
+            </Text>
+          </Pressable>
+        </Link>
+      </View>
+    </AuthScreenShell>
   );
 }

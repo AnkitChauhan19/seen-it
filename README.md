@@ -33,6 +33,14 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Health: [http://localhost:8000/health](http://localhost:8000/health)
 - Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+Media (TMDB proxy, key stays on server):
+
+- `GET /api/v1/media/search?q=interstellar&filter=all|movie|tv|anime&page=1`
+- `GET /api/v1/media/trending?filter=all|movie|tv|anime`
+- `GET /api/v1/media/popular-movies`
+
+Responses are cached in-memory, throttled toward TMDB, and rate-limited per client IP (`slowapi`).
+
 ## Mobile
 
 ```bash
@@ -41,10 +49,18 @@ npm install
 npm start
 ```
 
-Optional: set `EXPO_PUBLIC_API_BASE_URL` for a non-localhost backend (Android emulator often needs `http://10.0.2.2:8000`).
+Set in `mobile/.env` (see `mobile/.env.example`):
+
+- `EXPO_PUBLIC_API_BASE_URL` — Android emulator often needs `http://10.0.2.2:8000`
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key only; never the secret key)
+
+Run the SQL in `supabase/migrations/001_profiles.sql` in your Supabase project (creates `public.profiles` + auth trigger).
+
+Configure Supabase email redirect URLs for mobile: see [docs/supabase-auth-urls.md](./docs/supabase-auth-urls.md).
 
 ## Next steps
 
-1. Create a Supabase project and wire Auth + Postgres.
-2. Add TMDB credentials to `backend/.env`.
-3. Implement search / media endpoints and connect the Search screen.
+1. Run Supabase migrations in `supabase/migrations/`.
+2. Set `TMDB_API_KEY` in `backend/.env` and start the API before using Search on device/emulator.
+3. Run Supabase migrations `001`–`004` (profiles + `media` / `user_media` for watchlist & library).

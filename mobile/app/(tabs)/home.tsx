@@ -1,12 +1,36 @@
-import { Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { HomeHeader } from "@/components/home/home-header";
+import { LibraryKpiRow } from "@/components/home/library-kpi-row";
+import { RecentlyWatchedHero } from "@/components/home/recently-watched-hero";
+import { WatchlistPreviewRow } from "@/components/home/watchlist-preview-row";
+import { colors } from "@/constants/theme";
 
 export default function HomeScreen() {
+  const router = useRouter();
+
   return (
-    <View className="flex-1 items-center justify-center bg-slate-950 px-6">
-      <Text className="mb-2 text-2xl font-semibold text-white">Home</Text>
-      <Text className="text-center text-slate-400">
-        Your recent activity and quick actions will live here.
-      </Text>
-    </View>
+    <SafeAreaView
+      className="flex-1"
+      edges={["top"]}
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
+        <HomeHeader />
+        <RecentlyWatchedHero />
+        <LibraryKpiRow
+          onSeeAll={() => router.push("/(tabs)/watched")}
+        />
+        <WatchlistPreviewRow
+          onSeeAll={() => router.push("/(tabs)/watchlist")}
+        />
+        <View className="h-6" />
+      </ScrollView>
+    </SafeAreaView>
   );
 }

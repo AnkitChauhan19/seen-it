@@ -24,7 +24,8 @@
       "monochromeImage": "./assets/android-icon-monochrome.png"
     },
     "package": "com.seenit.app",
-    "predictiveBackGestureEnabled": false
+    "predictiveBackGestureEnabled": false,
+    "softwareKeyboardLayoutMode": "resize"
   },
   "web": {
     "bundler": "metro",

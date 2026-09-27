@@ -10,13 +10,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#f0f9ff",
-          100: "#e0f2fe",
-          500: "#0ea5e9",
-          600: "#0284c7",
-          700: "#0369a1",
-          900: "#0c4a6e",
+        seen: {
+          bg: "#000000",
+          surface: "#121212",
+          elevated: "#1a1a1a",
+          warm: "#1f1b14",
+          gold: "#e8b84a",
+          link: "#60a5fa",
         },
       },
     },

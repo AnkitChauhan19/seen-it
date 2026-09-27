@@ -22,6 +22,14 @@ class Settings(BaseSettings):
 
     tmdb_api_key: str = ""
     tmdb_base_url: str = "https://api.themoviedb.org/3"
+    tmdb_timeout_seconds: float = 20.0
+    tmdb_max_requests_per_second: float = 8.0
+    tmdb_max_page: int = 5
+    tmdb_cache_max_entries: int = 512
+    tmdb_discover_cache_ttl_seconds: int = 600
+    tmdb_search_cache_ttl_seconds: int = 120
+    tmdb_prefer_ipv4: bool = True
+    tmdb_max_retries: int = 3
 
     @property
     def cors_origins_list(self) -> list[str]:
