@@ -9,6 +9,7 @@ type ProfileSettingsRowProps = {
   subtitle?: string;
   value?: string;
   destructive?: boolean;
+  showChevron?: boolean;
   onPress?: () => void;
 };
 
@@ -18,6 +19,7 @@ export function ProfileSettingsRow({
   subtitle,
   value,
   destructive,
+  showChevron = true,
   onPress,
 }: ProfileSettingsRowProps) {
   const tint = destructive ? colors.error : colors.text;
@@ -43,7 +45,7 @@ export function ProfileSettingsRow({
         <Text className="text-sm" style={{ color: colors.textMuted }}>
           {value}
         </Text>
-      ) : onPress ? (
+      ) : onPress && showChevron ? (
         <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
       ) : null}
     </Pressable>

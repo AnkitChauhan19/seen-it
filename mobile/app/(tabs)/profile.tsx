@@ -210,12 +210,14 @@ export default function ProfileScreen() {
             icon="download-outline"
             title="Export Data"
             subtitle="Library, Theatres & Watchlist (.xlsx)"
+            showChevron={false}
             onPress={() => setExportConfirm(true)}
           />
           <SettingsDivider />
           <ProfileSettingsRow
             icon="log-out-outline"
             title="Sign Out"
+            showChevron={false}
             onPress={() => setSignOutConfirm(true)}
           />
           <SettingsDivider />
