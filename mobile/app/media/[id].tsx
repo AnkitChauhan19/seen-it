@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { TheaterAddModal } from "@/components/theater/theater-add-modal";
 import { AppActionSheet } from "@/components/ui/app-action-sheet";
 import { AppNoticeDialog } from "@/components/ui/app-notice-dialog";
 import { colors } from "@/constants/theme";
@@ -18,15 +19,19 @@ import {
   useUserMediaState,
 } from "@/hooks/use-user-media";
 import {
+  availableLibraryAddOptions,
+  hasAnyLibraryMembership,
+  libraryMembershipLabels,
+  normalizeShelfCategory,
+  rowHasTheaterMembership,
+} from "@/lib/library-membership";
+import {
   paramsToMediaSnapshot,
   type MediaDetailParams,
 } from "@/lib/media-route-params";
 import { tmdbPosterUrl } from "@/lib/tmdb-images";
-import {
-  LIBRARY_ADD_OPTIONS,
-  LIBRARY_CATEGORY_LABELS,
-} from "@/types/user-media";
-import type { LibraryCategory } from "@/types/user-media";
+import { LIBRARY_CATEGORY_LABELS } from "@/types/user-media";
+import type { LibraryCategory, TheaterWatchInput } from "@/types/user-media";
 
 export default function MediaDetailsScreen() {
   const router = useRouter();
@@ -35,9 +40,17 @@ export default function MediaDetailsScreen() {
 
   const snapshot = useMemo(() => paramsToMediaSnapshot(params), [params]);
   const { data: userMedia, isLoading } = useUserMediaState(compositeId);
-  const { addWatchlist, addLibrary, remove } = useUserMediaMutations();
+  const {
+    addWatchlist,
+    addLibrary,
+    addLibraryTheater,
+    remove,
+    removeTheater,
+    removeShelf,
+  } = useUserMediaMutations();
 
   const [librarySheetOpen, setLibrarySheetOpen] = useState(false);
+  const [theaterModalOpen, setTheaterModalOpen] = useState(false);
   const [notice, setNotice] = useState<{
     title: string;
     message?: string;
@@ -45,7 +58,14 @@ export default function MediaDetailsScreen() {
 
   const posterUri = tmdbPosterUrl(params.posterPath ?? "");
   const onWatchlist = userMedia?.status === "watchlist";
-  const inLibrary = userMedia?.status === "watched";
+  const inLibrary = userMedia ? hasAnyLibraryMembership(userMedia) : false;
+  const membershipSummary = userMedia
+    ? libraryMembershipLabels(userMedia).join(" · ")
+    : "";
+  const libraryAddOptions = useMemo(
+    () => availableLibraryAddOptions(userMedia ?? null, snapshot),
+    [userMedia, snapshot],
+  );
 
   const showNotice = (title: string, message?: string) => {
     setNotice({ title, message });
@@ -91,6 +111,11 @@ export default function MediaDetailsScreen() {
     const snap = ensureSnapshot();
     if (!snap) return;
 
+    if (category === "theaters") {
+      setTheaterModalOpen(true);
+      return;
+    }
+
     void addLibrary.mutate(
       { snapshot: snap, category },
       {
@@ -103,7 +128,38 @@ export default function MediaDetailsScreen() {
     );
   };
 
-  const removeFromLibrary = () => {
+  const submitTheaterDetails = (details: TheaterWatchInput) => {
+    const snap = ensureSnapshot();
+    if (!snap) return;
+
+    void addLibraryTheater.mutate(
+      { snapshot: snap, details },
+      {
+        onSuccess: () => {
+          setTheaterModalOpen(false);
+          showNotice("Added to library", LIBRARY_CATEGORY_LABELS.theaters);
+        },
+        onError: (err) =>
+          showNotice("Could not save", err.message),
+      },
+    );
+  };
+
+  const removeTheaterFromLibrary = () => {
+    if (!userMedia) return;
+    void removeTheater.mutate(userMedia.id, {
+      onSuccess: () => showNotice("Removed from theaters"),
+    });
+  };
+
+  const removeShelfFromLibrary = () => {
+    if (!userMedia) return;
+    void removeShelf.mutate(userMedia.id, {
+      onSuccess: () => showNotice("Removed from shelf"),
+    });
+  };
+
+  const removeEntireLibraryEntry = () => {
     if (!userMedia) return;
     void remove.mutate(userMedia.id, {
       onSuccess: () => showNotice("Removed from library"),
@@ -166,6 +222,15 @@ export default function MediaDetailsScreen() {
             <ActivityIndicator className="mt-6" color={colors.gold} />
           ) : null}
 
+          {inLibrary && membershipSummary ? (
+            <Text
+              className="mt-5 text-sm leading-5"
+              style={{ color: colors.gold }}
+            >
+              In your library: {membershipSummary}
+            </Text>
+          ) : null}
+
           <View className="mt-8 gap-3">
             <Pressable
               onPress={toggleWatchlist}
@@ -183,26 +248,10 @@ export default function MediaDetailsScreen() {
               </Text>
             </Pressable>
 
-            {inLibrary ? (
-              <Pressable
-                onPress={removeFromLibrary}
-                className="rounded-2xl py-4"
-                style={{ backgroundColor: colors.surfaceElevated }}
-              >
-                <Text
-                  className="text-center text-base font-semibold"
-                  style={{ color: colors.textMuted }}
-                >
-                  Remove from library
-                  {userMedia?.library_category
-                    ? ` (${LIBRARY_CATEGORY_LABELS[userMedia.library_category]})`
-                    : ""}
-                </Text>
-              </Pressable>
-            ) : (
+            {libraryAddOptions.length > 0 || inLibrary ? (
               <Pressable
                 onPress={() => setLibrarySheetOpen(true)}
-                disabled={addLibrary.isPending}
+                disabled={addLibrary.isPending || addLibraryTheater.isPending}
                 className="rounded-2xl py-4"
                 style={{ backgroundColor: colors.surfaceElevated }}
               >
@@ -210,10 +259,10 @@ export default function MediaDetailsScreen() {
                   className="text-center text-base font-bold"
                   style={{ color: colors.text }}
                 >
-                  Add to library
+                  {inLibrary ? "Library" : "Add to library"}
                 </Text>
               </Pressable>
-            )}
+            ) : null}
           </View>
 
           <Pressable onPress={() => router.back()} className="mt-6 py-2">
@@ -226,14 +275,73 @@ export default function MediaDetailsScreen() {
 
       <AppActionSheet
         visible={librarySheetOpen}
-        title="Add to library"
-        message="Choose where this title belongs in your library."
+        title={inLibrary ? "Library" : "Add to library"}
+        message={
+          inLibrary
+            ? membershipSummary
+              ? `On: ${membershipSummary}`
+              : undefined
+            : "Choose where this title belongs in your library."
+        }
         onClose={() => setLibrarySheetOpen(false)}
-        options={LIBRARY_ADD_OPTIONS.map((opt) => ({
-          key: opt.category,
-          label: opt.label,
-          onPress: () => addToLibraryCategory(opt.category),
-        }))}
+        options={[
+          ...libraryAddOptions.map((opt) => ({
+            key: `add-${opt.category}`,
+            label: opt.label,
+            onPress: () => {
+              setLibrarySheetOpen(false);
+              addToLibraryCategory(opt.category);
+            },
+          })),
+          ...(userMedia && rowHasTheaterMembership(userMedia)
+            ? [
+                {
+                  key: "remove-theater",
+                  label: `Remove from ${LIBRARY_CATEGORY_LABELS.theaters}`,
+                  destructive: true,
+                  onPress: () => {
+                    setLibrarySheetOpen(false);
+                    removeTheaterFromLibrary();
+                  },
+                },
+              ]
+            : []),
+          ...(userMedia && normalizeShelfCategory(userMedia.library_category)
+            ? [
+                {
+                  key: "remove-shelf",
+                  label: `Remove from ${LIBRARY_CATEGORY_LABELS[normalizeShelfCategory(userMedia.library_category)!]}`,
+                  destructive: true,
+                  onPress: () => {
+                    setLibrarySheetOpen(false);
+                    removeShelfFromLibrary();
+                  },
+                },
+              ]
+            : []),
+          ...(userMedia &&
+          libraryMembershipLabels(userMedia).length > 1
+            ? [
+                {
+                  key: "remove-all",
+                  label: "Remove from all shelves",
+                  destructive: true,
+                  onPress: () => {
+                    setLibrarySheetOpen(false);
+                    removeEntireLibraryEntry();
+                  },
+                },
+              ]
+            : []),
+        ]}
+      />
+
+      <TheaterAddModal
+        visible={theaterModalOpen}
+        mediaTitle={params.title ?? "Title"}
+        isSubmitting={addLibraryTheater.isPending}
+        onClose={() => setTheaterModalOpen(false)}
+        onSubmit={submitTheaterDetails}
       />
 
       <AppNoticeDialog

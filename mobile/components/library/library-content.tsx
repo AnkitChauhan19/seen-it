@@ -3,6 +3,7 @@ import { Link } from "expo-router";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { LibraryItemCard } from "@/components/library/library-item-card";
+import type { LibraryFilter } from "@/components/library/library-filter-chips";
 import type { LibraryViewMode } from "@/components/library/library-toolbar";
 import type { LibraryListItem } from "@/lib/user-media-mappers";
 import { colors } from "@/constants/theme";
@@ -10,15 +11,21 @@ import { colors } from "@/constants/theme";
 type LibraryContentProps = {
   viewMode: LibraryViewMode;
   items: LibraryListItem[];
+  libraryFilter: LibraryFilter;
   isLoading?: boolean;
-  onRemove: (userMediaId: string) => void;
+  onRemoveTheater: (userMediaId: string) => void;
+  onRemoveShelf: (userMediaId: string) => void;
+  onRemoveAll: (userMediaId: string) => void;
 };
 
 export function LibraryContent({
   viewMode,
   items,
+  libraryFilter,
   isLoading,
-  onRemove,
+  onRemoveTheater,
+  onRemoveShelf,
+  onRemoveAll,
 }: LibraryContentProps) {
   if (isLoading) {
     return (
@@ -63,7 +70,14 @@ export function LibraryContent({
       <View className="flex-row flex-wrap gap-3 px-5">
         {items.map((item) => (
           <View key={item.id} className="w-full">
-            <LibraryItemCard item={item} onRemove={onRemove} compact />
+            <LibraryItemCard
+              item={item}
+              libraryFilter={libraryFilter}
+              onRemoveTheater={onRemoveTheater}
+              onRemoveShelf={onRemoveShelf}
+              onRemoveAll={onRemoveAll}
+              compact
+            />
           </View>
         ))}
       </View>
@@ -73,7 +87,14 @@ export function LibraryContent({
   return (
     <View className="px-5">
       {items.map((item) => (
-        <LibraryItemCard key={item.id} item={item} onRemove={onRemove} />
+        <LibraryItemCard
+          key={item.id}
+          item={item}
+          libraryFilter={libraryFilter}
+          onRemoveTheater={onRemoveTheater}
+          onRemoveShelf={onRemoveShelf}
+          onRemoveAll={onRemoveAll}
+        />
       ))}
     </View>
   );

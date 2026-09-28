@@ -9,9 +9,6 @@ type LibraryKpiSummaryProps = {
 };
 
 export function LibraryKpiSummary({ stats }: LibraryKpiSummaryProps) {
-  const avg =
-    stats.avgRating != null ? stats.avgRating.toFixed(1) : "—";
-
   const SUMMARY = [
     {
       key: "watched",
@@ -26,13 +23,6 @@ export function LibraryKpiSummary({ stats }: LibraryKpiSummaryProps) {
       value: String(stats.theatersCount),
       icon: "ticket-outline" as const,
       iconColor: "#fb923c",
-    },
-    {
-      key: "rating",
-      label: "Avg. Rating",
-      value: avg,
-      icon: "star-outline" as const,
-      iconColor: colors.gold,
     },
   ];
 

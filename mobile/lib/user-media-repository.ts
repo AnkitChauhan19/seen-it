@@ -1,17 +1,37 @@
 import type { WatchlistPriority } from "@/components/watchlist/priority-badge";
 import { parseCompositeMediaId } from "@/lib/parse-media-id";
 import { supabase } from "@/lib/supabase";
+import {
+  isTheaterEligibleRow,
+  normalizeShelfCategory,
+  type ShelfLibraryCategory,
+} from "@/lib/library-membership";
 import type {
   LibraryCategory,
   MediaSnapshot,
+  TheaterWatchInput,
+  TheaterWatchRow,
   UserMediaRow,
   UserMediaStatus,
 } from "@/types/user-media";
 
+function normalizeTheaterWatch(
+  value: TheaterWatchRow | TheaterWatchRow[] | null | undefined,
+): TheaterWatchRow | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 function normalizeUserMediaRow(row: unknown): UserMediaRow {
-  const record = row as UserMediaRow & { media: UserMediaRow["media"] | UserMediaRow["media"][] };
+  const record = row as UserMediaRow & {
+    media: UserMediaRow["media"] | UserMediaRow["media"][];
+    theater_watches?: TheaterWatchRow | TheaterWatchRow[];
+  };
   const media = Array.isArray(record.media) ? record.media[0] : record.media;
-  return { ...record, media };
+  const theater_watch = normalizeTheaterWatch(
+    record.theater_watch ?? record.theater_watches,
+  );
+  return { ...record, media, theater_watch };
 }
 
 const USER_MEDIA_SELECT = `
@@ -35,6 +55,11 @@ const USER_MEDIA_SELECT = `
     poster_path,
     vote_average,
     is_anime
+  ),
+  theater_watches (
+    theater_name,
+    language,
+    format
   )
 `;
 
@@ -145,24 +170,180 @@ export async function addToWatchlist(
   if (error) throw new Error(error.message);
 }
 
+async function upsertWatchedShelf(
+  userId: string,
+  mediaId: string,
+  category: ShelfLibraryCategory,
+): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("user_media")
+    .upsert(
+      {
+        user_id: userId,
+        media_id: mediaId,
+        status: "watched",
+        library_category: category,
+        watched_date: today,
+        priority: "medium",
+      },
+      { onConflict: "user_id,media_id" },
+    )
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+/** Theater-only adds also land in Movies when no other shelf is set (not the reverse). */
+async function ensureMovieShelfIfUnset(userMediaId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("user_media")
+    .select("library_category")
+    .eq("id", userMediaId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  if (normalizeShelfCategory(data.library_category)) {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("user_media")
+    .update({ library_category: "movie" })
+    .eq("id", userMediaId);
+
+  if (updateError) throw new Error(updateError.message);
+}
+
+async function ensureWatchedForTheater(
+  userId: string,
+  mediaId: string,
+): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("user_media")
+    .select("id, status, watched_date")
+    .eq("user_id", userId)
+    .eq("media_id", mediaId)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+
+  if (existing) {
+    const patch: {
+      status: "watched";
+      watched_date?: string;
+    } = { status: "watched" };
+    if (existing.status !== "watched" || !existing.watched_date) {
+      patch.watched_date = today;
+    }
+
+    const { data, error } = await supabase
+      .from("user_media")
+      .update(patch)
+      .eq("id", existing.id)
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data.id;
+  }
+
+  const { data, error } = await supabase
+    .from("user_media")
+    .insert({
+      user_id: userId,
+      media_id: mediaId,
+      status: "watched",
+      library_category: null,
+      watched_date: today,
+      priority: "medium",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+async function fetchUserMediaById(userMediaId: string): Promise<UserMediaRow | null> {
+  const { data, error } = await supabase
+    .from("user_media")
+    .select(USER_MEDIA_SELECT)
+    .eq("id", userMediaId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? normalizeUserMediaRow(data) : null;
+}
+
+async function cleanupUserMediaIfEmpty(userMediaId: string): Promise<void> {
+  const row = await fetchUserMediaById(userMediaId);
+  if (!row || row.status !== "watched") return;
+
+  const hasShelf =
+    row.library_category !== null && row.library_category !== "theaters";
+  const hasTheater = normalizeTheaterWatch(row.theater_watch) !== null;
+
+  if (!hasShelf && !hasTheater) {
+    await removeUserMedia(userMediaId);
+  }
+}
+
 export async function addToLibrary(
   snapshot: MediaSnapshot,
   category: LibraryCategory,
 ): Promise<void> {
+  if (category === "theaters") {
+    throw new Error("Use addToLibraryTheater for theater visits.");
+  }
+
   const userId = await requireUserId();
   const mediaId = await ensureMediaRecord(snapshot);
-  const today = new Date().toISOString().slice(0, 10);
+  await upsertWatchedShelf(userId, mediaId, category);
+}
 
-  const { error } = await supabase.from("user_media").upsert(
+export async function addToLibraryTheater(
+  snapshot: MediaSnapshot,
+  details: TheaterWatchInput,
+): Promise<void> {
+  const userId = await requireUserId();
+  const mediaId = await ensureMediaRecord(snapshot);
+
+  const { data: mediaRow, error: mediaError } = await supabase
+    .from("media")
+    .select("tmdb_media_type, is_anime")
+    .eq("id", mediaId)
+    .single();
+
+  if (mediaError) throw new Error(mediaError.message);
+  if (
+    mediaRow.tmdb_media_type !== "movie" ||
+    mediaRow.is_anime
+  ) {
+    throw new Error("Only movies can be added to theaters.");
+  }
+
+  const userMediaId = await ensureWatchedForTheater(userId, mediaId);
+  await ensureMovieShelfIfUnset(userMediaId);
+
+  const row = await fetchUserMediaById(userMediaId);
+  if (row && !isTheaterEligibleRow(row)) {
+    throw new Error("Only movies can be added to theaters.");
+  }
+
+  const { error } = await supabase.from("theater_watches").upsert(
     {
-      user_id: userId,
-      media_id: mediaId,
-      status: "watched",
-      library_category: category,
-      watched_date: today,
-      priority: "medium",
+      user_media_id: userMediaId,
+      theater_name: details.theaterName,
+      language: details.language,
+      format: details.format,
     },
-    { onConflict: "user_id,media_id" },
+    { onConflict: "user_media_id" },
   );
 
   if (error) throw new Error(error.message);
@@ -175,6 +356,28 @@ export async function removeUserMedia(userMediaId: string): Promise<void> {
     .eq("id", userMediaId);
 
   if (error) throw new Error(error.message);
+}
+
+export async function removeTheaterMembership(
+  userMediaId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("theater_watches")
+    .delete()
+    .eq("user_media_id", userMediaId);
+
+  if (error) throw new Error(error.message);
+  await cleanupUserMediaIfEmpty(userMediaId);
+}
+
+export async function removeShelfMembership(userMediaId: string): Promise<void> {
+  const { error } = await supabase
+    .from("user_media")
+    .update({ library_category: null })
+    .eq("id", userMediaId);
+
+  if (error) throw new Error(error.message);
+  await cleanupUserMediaIfEmpty(userMediaId);
 }
 
 export async function removeByCompositeId(compositeId: string): Promise<void> {
@@ -199,31 +402,25 @@ export async function fetchHomeStats(): Promise<{
   watchedCount: number;
   watchlistCount: number;
   theatersCount: number;
-  avgRating: number | null;
 }> {
   const { data, error } = await supabase
     .from("user_media")
-    .select("status, library_category, personal_rating");
+    .select("status, library_category");
 
   if (error) throw new Error(error.message);
 
   const rows = data ?? [];
   const watched = rows.filter((r) => r.status === "watched");
   const watchlist = rows.filter((r) => r.status === "watchlist");
-  const theaters = watched.filter((r) => r.library_category === "theaters");
-  const ratings = watched
-    .map((r) => r.personal_rating)
-    .filter((r): r is number => typeof r === "number");
+  const { count: theatersCount, error: theaterError } = await supabase
+    .from("theater_watches")
+    .select("id", { count: "exact", head: true });
 
-  const avgRating =
-    ratings.length > 0
-      ? ratings.reduce((sum, n) => sum + n, 0) / ratings.length
-      : null;
+  if (theaterError) throw new Error(theaterError.message);
 
   return {
     watchedCount: watched.length,
     watchlistCount: watchlist.length,
-    theatersCount: theaters.length,
-    avgRating,
+    theatersCount: theatersCount ?? 0,
   };
 }

@@ -1,6 +1,11 @@
 import type { WatchlistItem } from "@/components/watchlist/watchlist-item-card";
 import type { WatchlistFilter } from "@/components/watchlist/watchlist-filter-chips";
 import type { LibraryFilter } from "@/components/library/library-filter-chips";
+import {
+  normalizeShelfCategory,
+  rowHasTheaterMembership,
+  type ShelfLibraryCategory,
+} from "@/lib/library-membership";
 import { LIBRARY_CATEGORY_LABELS } from "@/types/user-media";
 import type { LibraryCategory, UserMediaRow } from "@/types/user-media";
 import { toCompositeMediaId } from "@/lib/parse-media-id";
@@ -11,8 +16,12 @@ export function libraryCategoryLabel(category: LibraryCategory | null): string {
 }
 
 export function mediaTypeLabel(row: UserMediaRow): string {
-  if (row.status === "watched" && row.library_category) {
-    return libraryCategoryLabel(row.library_category);
+  const shelf = normalizeShelfCategory(row.library_category);
+  if (row.status === "watched" && shelf) {
+    return libraryCategoryLabel(shelf);
+  }
+  if (row.status === "watched" && rowHasTheaterMembership(row)) {
+    return LIBRARY_CATEGORY_LABELS.theaters;
   }
   if (row.media.is_anime) return "Anime";
   if (row.media.tmdb_media_type === "movie") return "Movie";
@@ -43,18 +52,37 @@ export function toWatchlistItem(row: UserMediaRow): WatchlistItem {
 }
 
 export type LibraryListItem = WatchlistItem & {
-  libraryCategory: LibraryCategory | null;
+  libraryCategory: ShelfLibraryCategory | null;
+  inTheaters: boolean;
   personalRating: number | null;
   updatedAt: string;
+  theaterLine?: string;
 };
 
+function theaterDetailLine(row: UserMediaRow): string | undefined {
+  if (!rowHasTheaterMembership(row)) return undefined;
+  const raw = row.theater_watch;
+  const tw = Array.isArray(raw) ? raw[0] : raw;
+  if (!tw) return undefined;
+  const parts = [tw.theater_name, tw.language, tw.format].filter(Boolean);
+  return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
 export function toLibraryItem(row: UserMediaRow): LibraryListItem {
+  const shelf = normalizeShelfCategory(row.library_category);
+  const inTheaters = rowHasTheaterMembership(row);
   return {
     ...toWatchlistItem(row),
-    libraryCategory: row.library_category,
-    type: libraryCategoryLabel(row.library_category),
+    libraryCategory: shelf,
+    inTheaters,
+    type: shelf
+      ? libraryCategoryLabel(shelf)
+      : inTheaters
+        ? LIBRARY_CATEGORY_LABELS.theaters
+        : mediaTypeLabel(row),
     personalRating: row.personal_rating,
     updatedAt: row.updated_at ?? row.created_at,
+    theaterLine: theaterDetailLine(row),
   };
 }
 
@@ -77,11 +105,14 @@ export function matchesLibraryFilter(
   row: UserMediaRow,
   filter: LibraryFilter,
 ): boolean {
-  if (filter === "All") return true;
-  if (filter === "Movies") return row.library_category === "movie";
-  if (filter === "TV Shows") return row.library_category === "tv_show";
-  if (filter === "Web Series") return row.library_category === "web_series";
-  if (filter === "Anime") return row.library_category === "anime";
-  if (filter === "Theaters") return row.library_category === "theaters";
+  const shelf = normalizeShelfCategory(row.library_category);
+  const inTheaters = rowHasTheaterMembership(row);
+
+  if (filter === "All") return shelf !== null || inTheaters;
+  if (filter === "Movies") return shelf === "movie";
+  if (filter === "TV Shows") return shelf === "tv_show";
+  if (filter === "Web Series") return shelf === "web_series";
+  if (filter === "Anime") return shelf === "anime";
+  if (filter === "Theaters") return inTheaters;
   return true;
 }

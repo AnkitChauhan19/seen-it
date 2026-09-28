@@ -28,6 +28,7 @@ export function SearchFilterChips({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={{ flexGrow: 0, flexShrink: 0 }}
       contentContainerClassName="gap-2 px-5 pb-4"
     >
       {SEARCH_FILTERS.map((filter) => {

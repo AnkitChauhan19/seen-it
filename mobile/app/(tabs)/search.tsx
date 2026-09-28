@@ -78,69 +78,59 @@ export default function SearchScreen() {
     trimmedQuery.length >= MIN_SEARCH_QUERY_LENGTH &&
     debouncedTrimmed !== trimmedQuery;
 
-  const searchHeader = (
-    <>
-      <HomeHeader />
-      {isResultsMode ? (
+  const showTooShort =
+    isResultsMode && trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH;
+  const showInitialLoading =
+    isResultsMode &&
+    !showTooShort &&
+    (searchQuery.isLoading || searchPending) &&
+    searchItems.length === 0;
+  const showError = isResultsMode && searchQuery.isError && !searchPending;
+
+  return (
+    <SafeAreaView
+      className="flex-1"
+      edges={["top"]}
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <View style={{ flexShrink: 0 }}>
+        <HomeHeader />
+        {!isResultsMode ? <SearchPageHeader /> : null}
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          showBack
+          showBack={isResultsMode}
           onBack={handleBack}
         />
-      ) : (
-        <>
-          <SearchPageHeader />
-          <SearchBar value={query} onChangeText={setQuery} />
-          <SearchHint />
-        </>
-      )}
-      <SearchFilterChips
-        active={activeFilter}
-        onChange={setActiveFilter}
-        counts={isResultsMode ? filterCounts : undefined}
-      />
-      {searchPending ? (
-        <View className="items-center py-2">
-          <ActivityIndicator color={colors.gold} size="small" />
-        </View>
-      ) : null}
-    </>
-  );
+        {!isResultsMode ? <SearchHint /> : null}
+        <SearchFilterChips
+          active={activeFilter}
+          onChange={setActiveFilter}
+          counts={isResultsMode ? filterCounts : undefined}
+        />
+        {searchPending ? (
+          <View className="items-center py-2">
+            <ActivityIndicator color={colors.gold} size="small" />
+          </View>
+        ) : null}
+      </View>
 
-  if (isResultsMode) {
-    const showTooShort =
-      trimmedQuery.length > 0 && trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH;
-    const showInitialLoading =
-      !showTooShort &&
-      (searchQuery.isLoading || searchPending) &&
-      searchItems.length === 0;
-    const showError = searchQuery.isError && !searchPending;
-
-    return (
-      <SafeAreaView
-        className="flex-1"
-        edges={["top"]}
-        style={{ flex: 1, backgroundColor: colors.background }}
-      >
+      {isResultsMode ? (
         <FlatList
+          style={{ flex: 1, minHeight: 0 }}
           data={showInitialLoading || showTooShort || showError ? [] : searchItems}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <SearchResultCard item={item} />}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           onEndReached={() => {
             if (searchQuery.hasNextPage && !searchQuery.isFetchingNextPage) {
               void searchQuery.fetchNextPage();
             }
           }}
           onEndReachedThreshold={0.35}
-          ListHeaderComponent={searchHeader}
           ListFooterComponent={
-            showInitialLoading ? (
-              <SearchResultsSkeleton count={4} />
-            ) : (
-              <SearchLoadingFooter visible={searchQuery.isFetchingNextPage} />
-            )
+            <SearchLoadingFooter visible={searchQuery.isFetchingNextPage} />
           }
           ListEmptyComponent={
             showTooShort
@@ -156,7 +146,7 @@ export default function SearchScreen() {
                     />
                   )
                 : showInitialLoading
-                  ? null
+                  ? () => <SearchResultsSkeleton count={4} />
                   : () => (
                       <View className="px-5 py-8">
                         <Text
@@ -169,34 +159,27 @@ export default function SearchScreen() {
                       </View>
                     )
           }
-          contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
         />
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView
-      className="flex-1"
-      edges={["top"]}
-      style={{ flex: 1, backgroundColor: colors.background }}
-    >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 24 }}
-      >
-        {searchHeader}
-        <SearchBrowseContent
-          trending={trendingQuery.data ?? []}
-          popularMovies={popularQuery.data ?? []}
-          isLoading={browseLoading}
-          isError={browseError}
-          errorMessage={browseErrorMessage}
-          onRetry={handleBrowseRetry}
-        />
-        <View className="h-4" />
-      </ScrollView>
+      ) : (
+        <ScrollView
+          style={{ flex: 1, minHeight: 0 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: 24 }}
+        >
+          <SearchBrowseContent
+            trending={trendingQuery.data ?? []}
+            popularMovies={popularQuery.data ?? []}
+            isLoading={browseLoading}
+            isError={browseError}
+            errorMessage={browseErrorMessage}
+            onRetry={handleBrowseRetry}
+          />
+          <View className="h-4" />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

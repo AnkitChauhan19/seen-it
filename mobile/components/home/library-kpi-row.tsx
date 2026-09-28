@@ -34,14 +34,6 @@ export function LibraryKpiRow({ onSeeAll }: LibraryKpiRowProps) {
       icon: "ticket-outline" as const,
       iconColor: "#fb923c",
     },
-    {
-      key: "rating",
-      label: "Avg. Rating",
-      value:
-        data?.avgRating != null ? data.avgRating.toFixed(1) : "—",
-      icon: "star-outline" as const,
-      iconColor: colors.gold,
-    },
   ];
 
   return (

@@ -1,8 +1,9 @@
 import * as Linking from "expo-linking";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { ensureUserProfile, fetchProfile } from "@/lib/auth-service";
+import { resetUserScopedQueryCache } from "@/lib/reset-query-cache";
 import {
   createSessionFromUrl,
   isAuthCallbackUrl,
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let isMounted = true;
+    const previousUserIdRef = { current: null as string | null };
 
     const loadProfile = async (userId: string) => {
       try {
@@ -52,6 +54,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = session?.user.id ?? null;
+      if (previousUserIdRef.current !== nextUserId) {
+        resetUserScopedQueryCache();
+      }
+      previousUserIdRef.current = nextUserId;
+
       setSession(session);
       if (session?.user.id) {
         void ensureUserProfile(session.user)

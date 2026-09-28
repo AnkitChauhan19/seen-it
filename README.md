@@ -63,4 +63,4 @@ Configure Supabase email redirect URLs for mobile: see [docs/supabase-auth-urls.
 
 1. Run Supabase migrations in `supabase/migrations/`.
 2. Set `TMDB_API_KEY` in `backend/.env` and start the API before using Search on device/emulator.
-3. Run Supabase migrations `001`–`004` (profiles + `media` / `user_media` for watchlist & library).
+3. Run Supabase migrations `001`–`008` (profiles, media library, theaters, and hardened `delete_own_account`).

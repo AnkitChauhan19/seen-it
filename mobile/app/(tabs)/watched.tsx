@@ -43,7 +43,7 @@ export default function WatchedScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: items = [], isLoading } = useLibrary(activeFilter);
-  const { remove } = useUserMediaMutations();
+  const { remove, removeTheater, removeShelf } = useUserMediaMutations();
 
   const filterStats = useMemo(
     () => computeLibraryFilterStats(items),
@@ -97,8 +97,11 @@ export default function WatchedScreen() {
         <LibraryContent
           viewMode={viewMode}
           items={displayedItems}
+          libraryFilter={activeFilter}
           isLoading={isLoading}
-          onRemove={(id) => void remove.mutate(id)}
+          onRemoveTheater={(id) => void removeTheater.mutate(id)}
+          onRemoveShelf={(id) => void removeShelf.mutate(id)}
+          onRemoveAll={(id) => void remove.mutate(id)}
         />
         <View className="h-4" />
       </ScrollView>

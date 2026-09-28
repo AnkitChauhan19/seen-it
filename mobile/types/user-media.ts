@@ -33,6 +33,19 @@ export type UserMediaRow = {
   created_at: string;
   updated_at: string;
   media: MediaRow;
+  theater_watch?: TheaterWatchRow | TheaterWatchRow[] | null;
+};
+
+export type TheaterWatchInput = {
+  theaterName: string;
+  language: string;
+  format: string;
+};
+
+export type TheaterWatchRow = {
+  theater_name: string;
+  language: string;
+  format: string;
 };
 
 export type MediaSnapshot = {
