@@ -3,7 +3,7 @@
   "slug": "seen-it",
   "version": "1.0.0",
   "orientation": "portrait",
-  "icon": "./assets/icon.png",
+  "icon": "./assets/app_icon.png",
   "scheme": "seenit",
   "userInterfaceStyle": "light",
   "newArchEnabled": true,
@@ -19,9 +19,7 @@
   "android": {
     "adaptiveIcon": {
       "backgroundColor": "#0f172a",
-      "foregroundImage": "./assets/android-icon-foreground.png",
-      "backgroundImage": "./assets/android-icon-background.png",
-      "monochromeImage": "./assets/android-icon-monochrome.png"
+      "foregroundImage": "./assets/app_icon.png"
     },
     "package": "com.seenit.app",
     "predictiveBackGestureEnabled": false,
@@ -37,5 +35,12 @@
   ],
   "experiments": {
     "typedRoutes": true
-  }
+  },
+  "extra": {
+    "router": {},
+    "eas": {
+      "projectId": "f7357307-58c2-4aaa-8768-9cea68dfadc7"
+    }
+  },
+  "owner": "ankit_19"
 }
